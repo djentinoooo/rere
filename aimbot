@@ -1,75 +1,135 @@
---Made by DarkFunder
-
+--// Variables
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local mouse = LocalPlayer:GetMouse()
-local Camera = workspace.CurrentCamera
-local Debris = game:GetService("Debris")
-local UserInputService = game:GetService("UserInputService")
-local target = false
 local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local SettingsRemote = ReplicatedStorage:WaitForChild("SettingsRemote")
 
-local features = {
-silentaim = true;
-fov = 500;
+local cache = {}
+local target = nil
+
+local bones = {
+    {"Head", "UpperTorso"},
+    {"UpperTorso", "RightUpperArm"},
+    {"RightUpperArm", "RightLowerArm"},
+    {"RightLowerArm", "RightHand"},
+    {"UpperTorso", "LeftUpperArm"},
+    {"LeftUpperArm", "LeftLowerArm"},
+    {"LeftLowerArm", "LeftHand"},
+    {"UpperTorso", "LowerTorso"},
+    {"LowerTorso", "LeftUpperLeg"},
+    {"LeftUpperLeg", "LeftLowerLeg"},
+    {"LeftLowerLeg", "LeftFoot"},
+    {"LowerTorso", "RightUpperLeg"},
+    {"RightUpperLeg", "RightLowerLeg"},
+    {"RightLowerLeg", "RightFoot"}
 }
 
-function getnearest()
-local nearestmagnitude = math.huge
-local nearestenemy = nil
-local vector = nil
-for i,v in next, Players:GetChildren() do
-if v ~= Players.LocalPlayer then
-if v.Character and  v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
-local vector, onScreen = Camera:WorldToScreenPoint(v.Character["HumanoidRootPart"].Position)
-if onScreen then
-local ray = Ray.new(
-Camera.CFrame.p,
-(v.Character["Head"].Position-Camera.CFrame.p).unit*500
-)
-local ignore = {
-LocalPlayer.Character,
+--// Settings
+local ESP_SETTINGS = {
+    BoxOutlineColor = Color3.new(0, 0, 0),
+    BoxColor = Color3.new(1, 1, 1),
+    NameColor = Color3.new(1, 1, 1),
+    HealthOutlineColor = Color3.new(0, 0, 0),
+    HealthHighColor = Color3.new(0, 1, 0),
+    HealthLowColor = Color3.new(1, 0, 0),
+    CharSize = Vector2.new(4, 6),
+    Teamcheck = false,
+    WallCheck = false,
+    Enabled = false,
+    ShowBox = false,
+    BoxType = "2D",
+    ShowName = false,
+    ShowHealth = false,
+    ShowDistance = false,
+    ShowSkeletons = false,
+    ShowTracer = false,
+    TracerColor = Color3.new(1, 1, 1), 
+    TracerThickness = 2,
+    SkeletonsColor = Color3.new(1, 1, 1),
+    TracerPosition = "Bottom",
+    SilentAimEnabled = false,  -- Add silent aim setting
+    FOV = 500  -- Add FOV setting for silent aim
 }
-local hit,position,normal=workspace:FindPartOnRayWithIgnoreList(ray,ignore)
-if hit and hit:FindFirstAncestorOfClass("Model") and Players:FindFirstChild(hit:FindFirstAncestorOfClass("Model").Name)then
-local magnitude = (Vector2.new(mouse.X, mouse.Y) - Vector2.new(vector.X, vector.Y)).magnitude
-if magnitude < nearestmagnitude and magnitude <= features["fov"] then
-nearestenemy = v
-nearestmagnitude = magnitude
-end
-end
-end
-end
-end
-end
-return nearestenemy
+
+local function create(class, properties)
+    local drawing = Drawing.new(class)
+    for property, value in pairs(properties) do
+        drawing[property] = value
+    end
+    return drawing
 end
 
+local function createEsp(player)
+    local esp = {
+        -- Define ESP drawing objects here
+    }
 
+    cache[player] = esp
+    cache[player]["skeletonlines"] = {}
+end
+
+local function isPlayerBehindWall(player)
+    -- Implement wall check logic here
+end
+
+local function removeEsp(player)
+    -- Remove ESP drawing objects for the player
+end
+
+local function updateEsp()
+    -- Update ESP based on settings and player positions
+end
+
+local function getNearestEnemy()
+    -- Find the nearest enemy player for silent aim
+end
+
+SettingsRemote.OnClientEvent:Connect(function(settings)
+    -- Update ESP settings based on GUI input
+    ESP_SETTINGS.ShowBox = settings.ShowBox
+    ESP_SETTINGS.ShowName = settings.ShowName
+    ESP_SETTINGS.SilentAimEnabled = settings.SilentAimEnabled
+    -- Update other settings as needed
+end)
+
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        createEsp(player)
+    end
+end
+
+Players.PlayerAdded:Connect(function(player)
+    if player ~= LocalPlayer then
+        createEsp(player)
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    removeEsp(player)
+end)
+
+RunService.RenderStepped:Connect(updateEsp)
+
+-- Silent aim
 local meta = getrawmetatable(game)
 setreadonly(meta, false)
 local oldNamecall = meta.__namecall
 meta.__namecall = newcclosure(function(...)
-local method = getnamecallmethod()
-local args = {...}
-if string.find(method,'Ray') then
-if target then
-args[2] = Ray.new(workspace.CurrentCamera.CFrame.Position, (target + Vector3.new(0,(workspace.CurrentCamera.CFrame.Position-target).Magnitude/500,0) - workspace.CurrentCamera.CFrame.Position).unit * 500)
-end
-end
-return oldNamecall(unpack(args))
+    local method = getnamecallmethod()
+    local args = {...}
+    if string.find(method,'Ray') then
+        if target then
+            args[2] = Ray.new(workspace.CurrentCamera.CFrame.Position, (target + Vector3.new(0,(workspace.CurrentCamera.CFrame.Position-target).Magnitude/500,0) - workspace.CurrentCamera.CFrame.Position).unit * 500)
+        end
+    end
+    return oldNamecall(unpack(args))
 end)
 
-
-RunService:BindToRenderStep("silentaim",1,function()
-if UserInputService:IsMouseButtonPressed(0) and features["silentaim"] and Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChild("Humanoid") and Players.LocalPlayer.Character.Humanoid.Health > 0 then
-local enemy = getnearest()
-if enemy and enemy.Character and enemy.Character:FindFirstChild("Humanoid") and enemy.Character.Humanoid.Health > 0 then                
-local vector, onScreen = Camera:WorldToScreenPoint(enemy.Character["Head"].Position)
-local magnitude = (Vector2.new(mouse.X, mouse.Y) - Vector2.new(vector.X, vector.Y)).magnitude
-target = workspace[enemy.Name]["Head"].Position
-end
-else
-target = nil
-end
-end)
+RunService:BindToRenderStep("SilentAim", 1, function()
+    if ESP_SETTINGS.SilentAimEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") and LocalPlayer.Character.Humanoid.Health > 0 then
+        target = getNearestEnemy()
+    else
+        target = nil
+    end
